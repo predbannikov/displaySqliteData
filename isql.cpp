@@ -9,7 +9,11 @@ ISql::ISql(QObject *parent): QObject (parent)
 void ISql::doWork()
 {
 //    qDebug() << "ISql doWork id:" << this->thread()->currentThreadId();
-    QString dbName = "db_name.sqlite";
+//    QFileInfo file(dbName);
+//    if(!file.exists()) {
+
+//    }
+
 
     db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(dbName);

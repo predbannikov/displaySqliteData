@@ -10,6 +10,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     qRegisterMetaType <QList <QPointF > >("QList <QPointF >");
 
+
+
     if (!QSqlDatabase::drivers().contains("QSQLITE"))
         QMessageBox::critical(
                     this,
@@ -230,10 +232,11 @@ void MainWindow::slotReadySql()
 {
     updateBox();
     QStringList list = emit signalLoadTables();
-    queue.append(list);
-
-
-    emit signalGetDataTable(queue.dequeue());
+    if(!list.isEmpty())
+    {
+        queue.append(list);
+        emit signalGetDataTable(queue.dequeue());
+    }
 
 }
 

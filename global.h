@@ -15,5 +15,6 @@ struct CustomSet {
 };
 
 static QString _service = "service";
+static QString dbName = "db_name.sqlite";
 
 #endif // GLOBAL_H
