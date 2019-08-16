@@ -1,13 +1,14 @@
 ﻿#include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+Q_DECLARE_METATYPE(QList <QPointF >)
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
-    QString dbName = "db_name.sqlite";
+    qRegisterMetaType <QList <QPointF > >("QList <QPointF >");
 
     if (!QSqlDatabase::drivers().contains("QSQLITE"))
         QMessageBox::critical(
@@ -15,15 +16,6 @@ MainWindow::MainWindow(QWidget *parent) :
                     "Unable to load database",
                     "This demo needs the SQLITE driver"
                     );
-
-
-    sdb = QSqlDatabase::addDatabase("QSQLITE");
-    sdb.setDatabaseName(dbName);
-    if (!sdb.open()) {
-        qDebug() << "Not open sqlite" << dbName << sdb.lastError().text();
-        return;
-    }
-
 
     chart = new QChart();
     chartView = new QChartView(chart);
@@ -37,15 +29,22 @@ MainWindow::MainWindow(QWidget *parent) :
 
     QPushButton *pb_save = new QPushButton("save");
     connect(pb_save, &QPushButton::clicked, [this] () mutable {
-        qDebug() << this->dataSet.size();
-        saveData();
+        qDebug() << this->dataSet[_service].points.size();
+//        QList<QPointF > points;
+        emit signalSaveData(dataSet[_service].points, _service);
     });
     quitButton = new QPushButton(tr("Quit"));
-    testButton = new QPushButton(tr("test"));
+    testButton = new QPushButton(tr("Create"));
     deleteButton = new QPushButton(tr("delete"));
     connect(quitButton, &QPushButton::clicked, this, &MainWindow::close);
-    connect(deleteButton, &QPushButton::clicked, this, &MainWindow::slotDelete);
-    connect(testButton, &QPushButton::clicked, this, &MainWindow::slotTest);
+    connect(testButton, &QPushButton::clicked, [this] () {
+        emit signalCreateTable(this->dataSet[_service].name);
+        updateBox();
+    });
+    connect(deleteButton, &QPushButton::clicked, [this] () {
+        emit signalDeleteTable(this->dataSet[_service].name);
+        updateBox();
+    });
     hblayout->addWidget(quitButton);
     hblayout->addWidget(testButton);
     hblayout->addWidget(deleteButton);
@@ -110,14 +109,7 @@ MainWindow::MainWindow(QWidget *parent) :
         }
     });
 
-    ISql *isql = new ISql;
-    _thread = new QThread;
-    connect(_thread, &QThread::started, isql, &ISql::doWork);
-    connect(_thread, &QThread::finished, isql, &ISql::deleteLater);
-
-    isql->moveToThread(_thread);
-    _thread->start();
-    qDebug() << "MainWindow this id:" << this->thread()->currentThreadId();
+    initISql();
 
     tabWidget->setCornerWidget(pb);
     mainLayout->addWidget(chartView);
@@ -126,39 +118,18 @@ MainWindow::MainWindow(QWidget *parent) :
 
     this->resize(640, 480);
     model->update();
-    updateBox();
 }
 
 MainWindow::~MainWindow()
 {
+//    qDebug() << "MainWindow deleteLater id:" << this->thread()->currentThreadId();
     _thread->quit();
+    _thread->wait();
     delete ui;
-}
-
-void MainWindow::slotDelete()
-{
-    QSqlQuery query(sdb);
-    if(!query.exec("DROP TABLE " + cmbbox->currentText()))
-        qDebug() << "not";
-    cmbbox->clear();
-    cmbbox->addItems(sdb.tables());
 }
 
 void MainWindow::slotTest()
 {
-////    QSqlQuery query(sdb);
-////    query.exec("insert into person2 values(0, 0)");
-
-////     QTableView *table = qobject_cast<QTableView *> (tabWidget->currentWidget());
-////     ModelPairs *model = qobject_cast<ModelPairs *>(table->model());
-
-//     QList<QPoint> list;
-//     QList<QLineSeries *> series;
-//     model->parsing(dataSet[dataSet[_service].name].points);
-
-////    model
-    createTable("service");
-
 }
 
 void MainWindow::clickView(QModelIndex index)
@@ -172,32 +143,21 @@ void MainWindow::clickView(QModelIndex index)
     }
 }
 
-//QTableView *MainWindow::createTable()
-//{
-//    QSqlQuery query(sdb);
-//    if(!sdb.tables().contains("chart"))
-//        query.exec("create table chart (X Integer, Y Integer, id_i integer)");
-//    else
-//        qDebug() << "already create chart";
-//    query.exec("insert into chart (X, Index) values(1, 0)");
-//    query.exec("insert into chart (Y, Index) values(1, 0)");
-
-
-
-
-
-//}
-
 void MainWindow::setSeries()
 {
-    QString name = dataSet[_service].name;
+    QString _name = dataSet[_service].name;
 
     chart->removeAllSeries();
     chart->legend()->hide();
     QLineSeries *series = new QLineSeries;
-    series->append(dataSet[name].points);
-    series->setName(name);
-    series->setColor(QColor(dataSet[name].color));
+    series->append(dataSet[_name].points);
+    series->setName(_name);
+    if(!dataSet[_name].width.isEmpty()) {
+        QPen pen;
+        pen.setWidth(dataSet[_name].width.toInt());
+        series->setPen(pen);
+    }
+    series->setColor(QColor(dataSet[_name].color));
     chart->addSeries(series);
     chart->createDefaultAxes();
 
@@ -214,52 +174,44 @@ void MainWindow::initSet()
     CustomSet _set;
     _set.name = _service;
     _set.color = "#00FF00";
+    _set.width = "5";
     QList <QPointF> s;
-    s << QPointF(2.3, 5) << QPointF(1,1) << QPointF(5,5) << QPointF(4,1) << QPointF(9,1) << QPointF(10,5) << QPointF(9.5,3) << QPointF(6,3) << QPointF(6.5,5);
-//    QList <QPointF> s1;
-//    s1 << QPointF(15, 1) << QPointF(11,1) << QPointF(12,5) << QPointF(16,5);
-//    QList <QPointF> s2;
-//    s2 << QPointF(17, 3) << QPointF(17.5,5) << QPointF(20,3) << QPointF(16.5,1) << QPointF(17, 3) << QPointF(13,3);
+    s << QPointF(2.3, 5) << QPointF(1,1) << QPointF(5,5) << QPointF(4,1)
+      << QPointF(9,1) << QPointF(9.5,3) << QPointF(6.5,3) << QPointF(7,5) << QPointF(6.5,3) << QPointF(9.5,3) << QPointF(10, 5)
+      << QPointF(11, 1) << QPointF(14,1) << QPointF(11,1) << QPointF(12,5) << QPointF(15, 5)
+      << QPointF(18,3) << QPointF(12.75,3) <<  QPointF(18, 3) << QPointF(15, 1);
     _set.points.append(s);
 //    _set.points.append(s1);
 //    _set.points.append(s2);
     dataSet.insert(_service, _set);
 }
 
-void MainWindow::createTable(QString _name)
-{
-    QSqlQuery query;
-    QString request = QString("CREATE TABLE '%1' ("
-                              "'id_i' INTEGER PRIMARY KEY, 'X' REAL, 'Y' REAL);").arg(_name);
-    if(!query.exec(request)) {
-        qDebug() << "Unable to create table" << _name;
-    }
-    updateBox();
-}
-
-void MainWindow::saveData()
-{
-    QString _table = dataSet[_service].name;
-    QSqlQuery query;
-    QString request;
-    for(int i = 0; i < dataSet[_table].points.size(); i++) {
-        request = QString("INSERT INTO '%1' ('X', 'Y', 'id_i') "
-                          "VALUES(%2, %3, %4);")
-                .arg(_table)
-                .arg(dataSet[_table].points[i].x())
-                .arg(dataSet[_table].points[i].y())
-                .arg(i);
-        if(!query.exec(request)) {
-            qDebug() << "Insert not succes" << request << i;
-            break;
-        }
-    }
-}
-
 void MainWindow::updateBox()
 {
     cmbbox->clear();
-    cmbbox->addItems(sdb.tables());
+//    qDebug() << "MainWindow updateBox id:" << this->thread()->currentThreadId();
+    QStringList list = emit signalLoadTables();
+    cmbbox->addItems(list);
+}
+
+void MainWindow::initISql()
+{
+    ISql *isql = new ISql;
+    _thread = new QThread;
+    connect(_thread, &QThread::started, isql, &ISql::doWork);
+    connect(_thread, &QThread::finished, isql, &ISql::deleteLater);
+    QObject::connect(this, &MainWindow::signalCreateTable, isql, &ISql::createTable);
+    QObject::connect(this, &MainWindow::signalLoadTables, isql, &ISql::loadTables, Qt::BlockingQueuedConnection);
+    QObject::connect(this, &MainWindow::signalDeleteTable, isql, &ISql::deleteTable);
+    QObject::connect(this, &MainWindow::signalGetDataTable, isql, &ISql::loadData);
+    QObject::connect(this, &MainWindow::signalSaveData, isql, &ISql::saveData);
+    QObject::connect(isql, &ISql::signalReady, this, &MainWindow::slotReadySql);
+    QObject::connect(isql, &ISql::signalSendDataTable, this, &MainWindow::initData);
+
+
+    isql->moveToThread(_thread);
+    _thread->start();
+//    qDebug() << "MainWindow this id:" << this->thread()->currentThreadId();
 }
 
 void MainWindow::slotDataChanged()
@@ -272,6 +224,26 @@ void MainWindow::slotDataChanged()
 bool MainWindow::containsName(QString name)
 {
     return dataSet.contains(name);
+}
+
+void MainWindow::slotReadySql()
+{
+    updateBox();
+    QStringList list = emit signalLoadTables();
+    queue.append(list);
+
+
+    emit signalGetDataTable(queue.dequeue());
+
+}
+
+void MainWindow::initData(QString _name, QList<QPointF> _points)
+{
+    while (!queue.isEmpty()) {
+        qDebug() << _name << _points;
+        emit signalGetDataTable(queue.dequeue());
+    }
+    mutex.unlock();
 }
 
 void MainWindow::loadTab()

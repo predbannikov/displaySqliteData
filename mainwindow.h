@@ -2,12 +2,11 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QtSql/QSqlDatabase>
-#include <QSqlQuery>
-#include <QtSql>
+#include <QMutex>
 #include <QDir>
 #include <QFile>
 #include <QSqlError>
+#include <QQueue>
 #include <QMessageBox>
 #include <QSqlTableModel>
 #include <QTableView>
@@ -61,21 +60,28 @@ private:
     ModelPairs *model;
     QChart *chart;
     QChartView *chartView;
+    QMutex mutex;
     QThread *_thread;
     void setSeries();
     void initSet();
-    void createTable(QString _name);
-    inline void saveData();
     void updateBox();
+    void initISql();
+    QQueue<QString> queue;
 public slots:
     void slotDataChanged();
     void loadTab();
-    void slotDelete();
     void slotTest();
     void clickView(QModelIndex index);
     bool containsName(QString name);
+    void slotReadySql();
+    void initData(QString _name, QList<QPointF > _points);
 signals:
     void signalLockChanged();
+    void signalCreateTable(QString);
+    void signalDeleteTable(QString);
+    void signalGetDataTable(QString);
+    void signalSaveData(const QList <QPointF > _points, const QString _table);
+    QStringList signalLoadTables();
 };
 
 #endif // MAINWINDOW_H
