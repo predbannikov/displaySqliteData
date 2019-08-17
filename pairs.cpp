@@ -46,6 +46,7 @@ QVariant ModelPairs::data(const QModelIndex &index, int role) const
     default:
         return QVariant();
     }
+
 }
 
 QVariant ModelPairs::headerData(int section, Qt::Orientation orientation, int role) const

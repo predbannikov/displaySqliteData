@@ -62,11 +62,11 @@ private:
     QChartView *chartView;
     QMutex mutex;
     QThread *_thread;
+    QTabBar *bar;
     void setSeries();
     void initSet();
     void updateBox();
     void initISql();
-    QQueue<QString> queue;
 public slots:
     void slotDataChanged();
     void loadTab();
@@ -74,7 +74,7 @@ public slots:
     void clickView(QModelIndex index);
     bool containsName(QString name);
     void slotReadySql();
-    void initData(QString _name, QList<QPointF > _points);
+    void initData(QString _tableName, QList<QPointF > _points);
 signals:
     void signalLockChanged();
     void signalCreateTable(QString);

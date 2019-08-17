@@ -33,7 +33,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(pb_save, &QPushButton::clicked, [this] () mutable {
         qDebug() << this->dataSet[_service].points.size();
 //        QList<QPointF > points;
-        emit signalSaveData(dataSet[_service].points, _service);
+        emit signalSaveData(dataSet[_service].points, this->dataSet[_service].name);
     });
     quitButton = new QPushButton(tr("Quit"));
     testButton = new QPushButton(tr("Create"));
@@ -82,7 +82,7 @@ MainWindow::MainWindow(QWidget *parent) :
     head->hide();
     tabWidget->addTab(table, QString(dataSet[_service].name));
     pb = new QPushButton();
-    QTabBar *bar = tabWidget->tabBar();
+    bar = tabWidget->tabBar();
     connect(bar, &QTabBar::currentChanged, [=] () {
         QString curTable = bar->tabText(tabWidget->currentIndex());
         //            qDebug() << "TABBAR CHANGE:" << curTable << dataSet[_service].points.size();
@@ -92,8 +92,8 @@ MainWindow::MainWindow(QWidget *parent) :
         setSeries();
     });
 
-    connect(pb, &QPushButton::clicked, [=] () {
-        QTabBar *bar = tabWidget->tabBar();
+    connect(pb, &QPushButton::clicked, [this] () {
+        this->bar = tabWidget->tabBar();
         emit signalLockChanged();
 
         Dialog dialog(dataSet, this);
@@ -102,9 +102,9 @@ MainWindow::MainWindow(QWidget *parent) :
         if(code == QDialog::Rejected)
             return;
         else if(code == QDialog::Accepted) {
-            int itab = bar->addTab(dataSet[_service].name);
-            bar->setCurrentIndex(itab);
-            QString curTable = bar->tabText(tabWidget->currentIndex());
+            int itab = this->bar->addTab(dataSet[_service].name);
+            this->bar->setCurrentIndex(itab);
+            QString curTable = this->bar->tabText(tabWidget->currentIndex());
             dataSet[_service].name = curTable;
             model->update();
             setSeries();
@@ -120,14 +120,17 @@ MainWindow::MainWindow(QWidget *parent) :
 
     this->resize(640, 480);
     model->update();
+    QString style;
 }
 
 MainWindow::~MainWindow()
 {
-//    qDebug() << "MainWindow deleteLater id:" << this->thread()->currentThreadId();
     _thread->quit();
     _thread->wait();
+    _thread->deleteLater();
+    delete _thread;
     delete ui;
+    qDebug() << "MainWindow deleteLater id:" << this->thread()->currentThreadId();
 }
 
 void MainWindow::slotTest()
@@ -176,7 +179,7 @@ void MainWindow::initSet()
     CustomSet _set;
     _set.name = _service;
     _set.color = "#00FF00";
-    _set.width = "5";
+    _set.width = "10";
     QList <QPointF> s;
     s << QPointF(2.3, 5) << QPointF(1,1) << QPointF(5,5) << QPointF(4,1)
       << QPointF(9,1) << QPointF(9.5,3) << QPointF(6.5,3) << QPointF(7,5) << QPointF(6.5,3) << QPointF(9.5,3) << QPointF(10, 5)
@@ -194,6 +197,10 @@ void MainWindow::updateBox()
 //    qDebug() << "MainWindow updateBox id:" << this->thread()->currentThreadId();
     QStringList list = emit signalLoadTables();
     cmbbox->addItems(list);
+
+    for(int i = 0; i < list.size(); i++) {
+        bar->addTab(list[i]);
+    }
 }
 
 void MainWindow::initISql()
@@ -232,21 +239,17 @@ void MainWindow::slotReadySql()
 {
     updateBox();
     QStringList list = emit signalLoadTables();
-    if(!list.isEmpty())
+    for(int i = 0; i < list.size(); i++)
     {
-        queue.append(list);
-        emit signalGetDataTable(queue.dequeue());
+        emit signalGetDataTable(list[i]);
     }
-
 }
 
-void MainWindow::initData(QString _name, QList<QPointF> _points)
+void MainWindow::initData(QString _tableName, QList<QPointF> _points)
 {
-    while (!queue.isEmpty()) {
-        qDebug() << _name << _points;
-        emit signalGetDataTable(queue.dequeue());
-    }
-    mutex.unlock();
+    qDebug() << "respons" << _tableName ;
+    dataSet[_tableName].name = _tableName;
+    dataSet[_tableName].points = _points;
 }
 
 void MainWindow::loadTab()

@@ -6,7 +6,9 @@
 #include <QThread>
 #include <QtSql/QSqlDatabase>
 #include <QSqlQuery>
+#include <QJsonObject>
 #include <QtSql>
+#include <QMutex>
 #include "global.h"
 
 class ISql : public QObject
@@ -18,14 +20,19 @@ public:
 
 private:
     QSqlDatabase db;
+    QQueue<QJsonObject> queue;
+    QMutex mutex;
+    QMap<QString, const QList<QPointF > *> points;
 
+    void parsQueue();
 public slots:
     void doWork();
-    void loadData(QString _name);
+    void loadData(QString _tableName);
     QStringList loadTables();
-    void createTable(QString _name);
-    void saveData(const QList<QPointF> _point, const QString _name);
-    void deleteTable(QString _name);
+    void createTable(QString _tableName);
+    void saveData(const QList<QPointF> _point, const QString _tableName);
+    void deleteTable(QString _tableName);
+
 signals:
     void signalReady();
     void signalSendDataTable(QString, QList<QPointF >);
