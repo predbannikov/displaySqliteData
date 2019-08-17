@@ -22,7 +22,7 @@ private:
     QSqlDatabase db;
     QQueue<QJsonObject> queue;
     QMutex mutex;
-    QMap<QString, const QList<QPointF > *> points;
+    QMap<QString, const CustomSet *> data;
 
     void parsQueue();
 public slots:
@@ -30,12 +30,12 @@ public slots:
     void loadData(QString _tableName);
     QStringList loadTables();
     void createTable(QString _tableName);
-    void saveData(const QList<QPointF> _point, const QString _tableName);
     void deleteTable(QString _tableName);
-
+    void saveData(const CustomSet _set);
+    void saveWidth(QString _tableName);
 signals:
     void signalReady();
-    void signalSendDataTable(QString, QList<QPointF >);
+    void signalSendDataTable(CustomSet);
 };
 
 #endif // ISQL_H

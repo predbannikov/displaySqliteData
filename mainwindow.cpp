@@ -1,7 +1,23 @@
-﻿#include "mainwindow.h"
+﻿/*
+ *  Выполняются два потока
+ *  1) GUI - основной поток реализация интерфейса
+ *
+ *      dataSet - QMap загруженных всех данных с БД
+ *      первый элемент <_service> вспомогательный для передачи параметров
+ *
+ *      createTab(QString table) - создать таблицу и соответсвующую вкладку
+ *
+ *
+ *
+ *  2) ISql - поток обрабатывающий очередь комманд
+ *
+ *
+ */
+#include "mainwindow.h"
 #include "ui_mainwindow.h"
 
 Q_DECLARE_METATYPE(QList <QPointF >)
+Q_DECLARE_METATYPE(CustomSet)
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -9,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     qRegisterMetaType <QList <QPointF > >("QList <QPointF >");
+    qRegisterMetaType <CustomSet> ("CustomSet");
 
 
 
@@ -32,20 +49,23 @@ MainWindow::MainWindow(QWidget *parent) :
     QPushButton *pb_save = new QPushButton("save");
     connect(pb_save, &QPushButton::clicked, [this] () mutable {
         qDebug() << this->dataSet[_service].points.size();
-//        QList<QPointF > points;
-        emit signalSaveData(dataSet[_service].points, this->dataSet[_service].name);
+        emit signalSaveData(dataSet[this->dataSet[_service].name]);
     });
     quitButton = new QPushButton(tr("Quit"));
-    testButton = new QPushButton(tr("Create"));
+    testButton = new QPushButton(tr("test"));
     deleteButton = new QPushButton(tr("delete"));
     connect(quitButton, &QPushButton::clicked, this, &MainWindow::close);
     connect(testButton, &QPushButton::clicked, [this] () {
-        emit signalCreateTable(this->dataSet[_service].name);
+        QMapIterator<QString, CustomSet> it(this->dataSet);
+        while(it.hasNext()) {
+            it.next();
+            qDebug().noquote() << "DEBUG:MainWindow: " << it.key() << " size =" << it.value().points.size();
+        }
         updateBox();
     });
     connect(deleteButton, &QPushButton::clicked, [this] () {
-        emit signalDeleteTable(this->dataSet[_service].name);
-        updateBox();
+        QString curTable = this->bar->tabText(this->bar->currentIndex());
+        removeTab(curTable);
     });
     hblayout->addWidget(quitButton);
     hblayout->addWidget(testButton);
@@ -92,7 +112,7 @@ MainWindow::MainWindow(QWidget *parent) :
         setSeries();
     });
 
-    connect(pb, &QPushButton::clicked, [this] () {
+    connect(pb, &QPushButton::clicked, [this] () {          // Добавить таблицу
         this->bar = tabWidget->tabBar();
         emit signalLockChanged();
 
@@ -102,12 +122,8 @@ MainWindow::MainWindow(QWidget *parent) :
         if(code == QDialog::Rejected)
             return;
         else if(code == QDialog::Accepted) {
-            int itab = this->bar->addTab(dataSet[_service].name);
-            this->bar->setCurrentIndex(itab);
-            QString curTable = this->bar->tabText(tabWidget->currentIndex());
-            dataSet[_service].name = curTable;
-            model->update();
-            setSeries();
+            createTab(dataSet[_service].name);
+            emit signalCreateTable(dataSet[_service].name);
         }
     });
 
@@ -198,9 +214,9 @@ void MainWindow::updateBox()
     QStringList list = emit signalLoadTables();
     cmbbox->addItems(list);
 
-    for(int i = 0; i < list.size(); i++) {
-        bar->addTab(list[i]);
-    }
+//    for(int i = 0; i < list.size(); i++) {
+//        bar->addTab(list[i]);
+//    }
 }
 
 void MainWindow::initISql()
@@ -209,7 +225,7 @@ void MainWindow::initISql()
     _thread = new QThread;
     connect(_thread, &QThread::started, isql, &ISql::doWork);
     connect(_thread, &QThread::finished, isql, &ISql::deleteLater);
-    QObject::connect(this, &MainWindow::signalCreateTable, isql, &ISql::createTable);
+    QObject::connect(this, &MainWindow::signalCreateTable, isql, &ISql::createTable, Qt::BlockingQueuedConnection);
     QObject::connect(this, &MainWindow::signalLoadTables, isql, &ISql::loadTables, Qt::BlockingQueuedConnection);
     QObject::connect(this, &MainWindow::signalDeleteTable, isql, &ISql::deleteTable);
     QObject::connect(this, &MainWindow::signalGetDataTable, isql, &ISql::loadData);
@@ -241,16 +257,58 @@ void MainWindow::slotReadySql()
     QStringList list = emit signalLoadTables();
     for(int i = 0; i < list.size(); i++)
     {
+        if(list[i] == _service)
+            continue;
         emit signalGetDataTable(list[i]);
     }
 }
 
-void MainWindow::initData(QString _tableName, QList<QPointF> _points)
+void MainWindow::initData(CustomSet _set)
 {
-    qDebug() << "respons" << _tableName ;
-    dataSet[_tableName].name = _tableName;
-    dataSet[_tableName].points = _points;
+    qDebug() << "respons" << _set.name ;
+    dataSet[_set.name] = _set;
+    createTab(_set.name);
 }
+
+void MainWindow::createTab(QString _tableName)
+{
+    int itab = this->bar->addTab(_tableName);
+    this->bar->setCurrentIndex(itab);
+    model->update();
+    setSeries();
+    updateBox();
+}
+
+void MainWindow::removeTab(QString _tableName)
+{
+    try {
+        if(_tableName != dataSet[_service].name)
+            throw 1;
+        if(_tableName == _service) {
+            QMessageBox msgBox(QMessageBox::Information, "Note", "Service нельзя удалить", QMessageBox::Ok, this);
+            msgBox.exec();
+            return;
+        }
+        int curIndexBar = bar->currentIndex();
+        bar->removeTab(curIndexBar);
+        curIndexBar++;
+        if(curIndexBar < 1)
+            throw 2;
+        bar->setCurrentIndex(curIndexBar);
+        emit signalDeleteTable(_tableName);
+        dataSet.remove(_tableName);
+        updateBox();
+
+    } catch (int a) {
+        switch (a) {
+        case 1: qErrnoWarning("ER: dataSet does not math current tab"); break;
+        case 2: qErrnoWarning("ER: removeTab want delete 0 item ('service')"); break;
+        default: qDebug() << "ERROR not handled";
+        }
+    }
+
+}
+
 
 void MainWindow::loadTab()
 {

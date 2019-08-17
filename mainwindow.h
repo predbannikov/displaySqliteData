@@ -25,9 +25,9 @@
 
 QT_CHARTS_USE_NAMESPACE
 
-struct CurTable {
-    QString table;
-};
+//struct CurTable {
+//    QString table;
+//};
 
 
 namespace Ui {
@@ -53,7 +53,7 @@ private:
     QPushButton *deleteButton;
     QComboBox *cmbbox;
     QSqlDatabase sdb;
-    CurTable tables;
+//    CurTable tables;
     QTabWidget *tabWidget;
 //    QTableView *createTable();
     QTableView *table;
@@ -67,6 +67,8 @@ private:
     void initSet();
     void updateBox();
     void initISql();
+    void createTab(QString _tableName);
+    void removeTab(QString _tableName);
 public slots:
     void slotDataChanged();
     void loadTab();
@@ -74,13 +76,13 @@ public slots:
     void clickView(QModelIndex index);
     bool containsName(QString name);
     void slotReadySql();
-    void initData(QString _tableName, QList<QPointF > _points);
+    void initData(CustomSet _set);
 signals:
     void signalLockChanged();
     void signalCreateTable(QString);
     void signalDeleteTable(QString);
     void signalGetDataTable(QString);
-    void signalSaveData(const QList <QPointF > _points, const QString _table);
+    void signalSaveData(CustomSet);
     QStringList signalLoadTables();
 };
 
