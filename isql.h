@@ -15,7 +15,7 @@ class ISql : public QObject
 {
     Q_OBJECT
 public:
-    explicit ISql(QObject *parent = nullptr);
+    explicit ISql(QString path = "/home/user/.local/share", QObject *parent = nullptr);
     ~ISql();
 
 private:
@@ -23,6 +23,7 @@ private:
     QQueue<QJsonObject> queue;
     QMutex mutex;
     QMap<QString, const CustomSet *> data;
+    QString pathData;
 
     void parsQueue();
 public slots:

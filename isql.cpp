@@ -1,9 +1,8 @@
 #include "isql.h"
 
-ISql::ISql(QObject *parent): QObject (parent)
+ISql::ISql(QString path, QObject *parent): QObject (parent)
 {
-
-
+    pathData = path;
 }
 
 void ISql::doWork()
@@ -16,7 +15,10 @@ void ISql::doWork()
 
 
     db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName(dbName);
+    QString pathSql = pathData + "/" + dbName;
+    qDebug() << pathSql;
+    qDebug() << pathData;
+    db.setDatabaseName(pathSql);
     if (!db.open()) {
         qDebug() << "Not open sqlite" << dbName << db.lastError().text();
         return;

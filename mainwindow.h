@@ -25,10 +25,6 @@
 
 QT_CHARTS_USE_NAMESPACE
 
-//struct CurTable {
-//    QString table;
-//};
-
 
 namespace Ui {
 class MainWindow;
@@ -43,6 +39,7 @@ public:
     ~MainWindow();
 
 private:
+    QString pathData;
     Ui::MainWindow *ui;
     QMap<QString, CustomSet > dataSet;
     QPushButton *saveButton;
@@ -53,9 +50,7 @@ private:
     QPushButton *deleteButton;
     QComboBox *cmbbox;
     QSqlDatabase sdb;
-//    CurTable tables;
     QTabWidget *tabWidget;
-//    QTableView *createTable();
     QTableView *table;
     ModelPairs *model;
     QChart *chart;
@@ -63,6 +58,7 @@ private:
     QMutex mutex;
     QThread *_thread;
     QTabBar *bar;
+    bool prepWorkPath();
     void setSeries();
     void initSet();
     void updateBox();

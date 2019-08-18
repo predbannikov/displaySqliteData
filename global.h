@@ -14,7 +14,8 @@ struct CustomSet {
     bool active;
 };
 
-static QString _service = "service";
-static QString dbName = "db_name.sqlite";
+static const QString _service = "service";
+static const QString dbName = "db_name.sqlite";
+static const QString fileNameConfig = "config_data";
 
 #endif // GLOBAL_H

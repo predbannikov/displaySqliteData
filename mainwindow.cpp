@@ -36,6 +36,11 @@ MainWindow::MainWindow(QWidget *parent) :
                     "This demo needs the SQLITE driver"
                     );
 
+    if(!prepWorkPath()) {
+        qDebug() << "exit";
+        exit(1);
+    }
+
     chart = new QChart();
     chartView = new QChartView(chart);
     chartView->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
@@ -149,6 +154,49 @@ MainWindow::~MainWindow()
     qDebug() << "MainWindow deleteLater id:" << this->thread()->currentThreadId();
 }
 
+bool MainWindow::prepWorkPath()
+{
+    QString curPath = QApplication::applicationDirPath();
+//    curPath.clear();
+
+    if(!QFileInfo::exists(curPath + "/" +fileNameConfig)) {            // 1
+        QString nameConfig = curPath + "/" + fileNameConfig;
+        qDebug() << "nameConfig" << nameConfig;
+        QFile fileConfig(nameConfig);
+        if(!fileConfig.open(QFile::WriteOnly | QFile::Text)) {
+            int ret = QMessageBox::warning(this, "Warning",
+                                           "В текущей дирректории не удаётся сохранить данные, желаете работать c домашним каталогом?",
+                                           QMessageBox::Ok, QMessageBox::Cancel);
+            switch (ret) {
+            case QMessageBox::Cancel:
+                qDebug() << "cancel";
+                return false;
+            case QMessageBox::Ok:
+                pathData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+                QDir dir(pathData);
+                if(!dir.exists(pathData)) {
+                    qDebug() << "path not exists";
+                    dir.mkdir(pathData);
+                }
+                qDebug() << "PATH: " << pathData;
+                qDebug() << "CONFIG: " << pathData + "/" + fileNameConfig;
+                qDebug() << "SQL: " << pathData + "/" + dbName;
+                return true;;
+
+            }
+        }
+    } else {
+        pathData = curPath = QApplication::applicationDirPath();;
+        qDebug() << "PATH: " << curPath;
+        qDebug() << "CONFIG: " << curPath + "/" + fileNameConfig;
+        qDebug() << "SQL: " << curPath + "/" + dbName;
+    }
+
+    qDebug() << "\n";
+    return true;
+
+}
+
 void MainWindow::slotTest()
 {
 }
@@ -221,7 +269,7 @@ void MainWindow::updateBox()
 
 void MainWindow::initISql()
 {
-    ISql *isql = new ISql;
+    ISql *isql = new ISql(pathData);
     _thread = new QThread;
     connect(_thread, &QThread::started, isql, &ISql::doWork);
     connect(_thread, &QThread::finished, isql, &ISql::deleteLater);
