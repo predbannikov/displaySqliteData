@@ -157,7 +157,6 @@ MainWindow::~MainWindow()
 bool MainWindow::prepWorkPath()
 {
     QString curPath = QApplication::applicationDirPath();
-//    curPath.clear();
 
     if(!QFileInfo::exists(curPath + "/" +fileNameConfig)) {            // 1
         QString nameConfig = curPath + "/" + fileNameConfig;
@@ -181,18 +180,16 @@ bool MainWindow::prepWorkPath()
                 qDebug() << "PATH: " << pathData;
                 qDebug() << "CONFIG: " << pathData + "/" + fileNameConfig;
                 qDebug() << "SQL: " << pathData + "/" + dbName;
-                return true;;
+                return true;
 
             }
         }
-    } else {
-        pathData = curPath = QApplication::applicationDirPath();;
-        qDebug() << "PATH: " << curPath;
-        qDebug() << "CONFIG: " << curPath + "/" + fileNameConfig;
-        qDebug() << "SQL: " << curPath + "/" + dbName;
     }
+    pathData = curPath = QApplication::applicationDirPath();;
+    qDebug() << "PATH: " << curPath;
+    qDebug() << "CONFIG: " << curPath + "/" + fileNameConfig;
+    qDebug() << "SQL: " << curPath + "/" + dbName;
 
-    qDebug() << "\n";
     return true;
 
 }
