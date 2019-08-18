@@ -52,8 +52,17 @@ MainWindow::MainWindow(QWidget *parent) :
     QHBoxLayout *hblayout = new QHBoxLayout;
 
     QPushButton *pb_save = new QPushButton("save");
-    connect(pb_save, &QPushButton::clicked, [this] () mutable {
-        qDebug() << this->dataSet[_service].points.size();
+    connect(pb_save, &QPushButton::clicked, [this] () {                     // Save
+        if(this->dataSet[_service].name == _service) {
+            QMessageBox::warning(
+                        this,
+                        "Note",
+                        "service таблицу нельзя сохранить"
+                        );
+            return;
+        }
+//        bar->currentIndex();
+        bar->setTabIcon(bar->currentIndex(), QIcon());
         emit signalSaveData(dataSet[this->dataSet[_service].name]);
     });
     quitButton = new QPushButton(tr("Quit"));
@@ -66,17 +75,37 @@ MainWindow::MainWindow(QWidget *parent) :
             it.next();
             qDebug().noquote() << "DEBUG:MainWindow: " << it.key() << " size =" << it.value().points.size();
         }
-        updateBox();
+        qDebug() << jDataConfig;
+//        updateBox();
     });
-    connect(deleteButton, &QPushButton::clicked, [this] () {
+    connect(deleteButton, &QPushButton::clicked, [this] () {                    // remove
         QString curTable = this->bar->tabText(this->bar->currentIndex());
         removeTab(curTable);
     });
-    hblayout->addWidget(quitButton);
-    hblayout->addWidget(testButton);
-    hblayout->addWidget(deleteButton);
+    QPushButton *pb_load = new QPushButton(tr("Загрузить"));
+    connect(pb_load, &QPushButton::clicked, [this] () {
+        QString fileName = QFileDialog::getOpenFileName(this,
+            tr("Open sqlite db"), QApplication::applicationDirPath());
+        if(!fileName.isEmpty()) {
+            QEventLoop loop;
+            connect(isql, &ISql::finished, &loop, &QEventLoop::quit);
+            _thread->quit();
+            _thread->wait();
+            loop.exec();
+            _thread->deleteLater();
+            addNewDB(fileName);
+            resetWindow();
+            initISql(jConfig["pathSql"].toString());
+        }
+    });
+
+//    hblayout->addWidget(quitButton);
+//    hblayout->addWidget(testButton);
     hblayout->addWidget(pb_save);
-    hblayout->addWidget(cmbbox);
+    hblayout->addWidget(pb_load);
+    hblayout->addWidget(deleteButton);
+    hblayout->addStretch();
+//    hblayout->addWidget(cmbbox);
 
     QVBoxLayout *mainLayout = new QVBoxLayout;
     QWidget *window = new QWidget();
@@ -106,11 +135,18 @@ MainWindow::MainWindow(QWidget *parent) :
     QHeaderView *head = table->horizontalHeader();
     head->hide();
     tabWidget->addTab(table, QString(dataSet[_service].name));
-    pb = new QPushButton();
+    pb = new QPushButton();         // Кнопка добавить таблицу
+    QString  pixmapstr = ":/addico.png";
+    QPixmap pixmap(pixmapstr);
+    QIcon ico = QIcon(pixmap);
+    pb->setIcon(ico);
+    pb->setIconSize(QSize(15, 15));
+
     bar = tabWidget->tabBar();
     connect(bar, &QTabBar::currentChanged, [=] () {
         QString curTable = bar->tabText(tabWidget->currentIndex());
         //            qDebug() << "TABBAR CHANGE:" << curTable << dataSet[_service].points.size();
+
         emit signalLockChanged();
         dataSet[_service].name = curTable;
         model->update();
@@ -122,17 +158,19 @@ MainWindow::MainWindow(QWidget *parent) :
         emit signalLockChanged();
 
         Dialog dialog(dataSet, this);
-        dialog.show();
+        dialog.setModal(true);
+//        dialog.show();
         int code = dialog.exec();
         if(code == QDialog::Rejected)
             return;
         else if(code == QDialog::Accepted) {
             createTab(dataSet[_service].name);
+            saveConfig();
             emit signalCreateTable(dataSet[_service].name);
         }
     });
 
-    initISql();
+    initISql(jConfig["pathSql"].toString());
 
     tabWidget->setCornerWidget(pb);
     mainLayout->addWidget(chartView);
@@ -148,50 +186,190 @@ MainWindow::~MainWindow()
 {
     _thread->quit();
     _thread->wait();
-    _thread->deleteLater();
     delete _thread;
     delete ui;
     qDebug() << "MainWindow deleteLater id:" << this->thread()->currentThreadId();
 }
 
-bool MainWindow::prepWorkPath()
+QString MainWindow::getIndexCurName()
 {
-    QString curPath = QApplication::applicationDirPath();
-
-    if(!QFileInfo::exists(curPath + "/" +fileNameConfig)) {            // 1
-        QString nameConfig = curPath + "/" + fileNameConfig;
-        qDebug() << "nameConfig" << nameConfig;
-        QFile fileConfig(nameConfig);
-        if(!fileConfig.open(QFile::WriteOnly | QFile::Text)) {
-            int ret = QMessageBox::warning(this, "Warning",
-                                           "В текущей дирректории не удаётся сохранить данные, желаете работать c домашним каталогом?",
-                                           QMessageBox::Ok, QMessageBox::Cancel);
-            switch (ret) {
-            case QMessageBox::Cancel:
-                qDebug() << "cancel";
-                return false;
-            case QMessageBox::Ok:
-                pathData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-                QDir dir(pathData);
-                if(!dir.exists(pathData)) {
-                    qDebug() << "path not exists";
-                    dir.mkdir(pathData);
-                }
-                qDebug() << "PATH: " << pathData;
-                qDebug() << "CONFIG: " << pathData + "/" + fileNameConfig;
-                qDebug() << "SQL: " << pathData + "/" + dbName;
-                return true;
-
-            }
+    QString index;
+    QJsonArray array = jConfig["dbPaths"].toArray();
+    for(int i = 0; i < array.size(); i++) {
+        QJsonObject jobj = array[i].toObject();
+        if(jobj["path"].toString() == jConfig["pathSql"].toString()) {
+            index = jobj["index"].toString();
         }
     }
-    pathData = curPath = QApplication::applicationDirPath();;
-    qDebug() << "PATH: " << curPath;
-    qDebug() << "CONFIG: " << curPath + "/" + fileNameConfig;
-    qDebug() << "SQL: " << curPath + "/" + dbName;
+    return index;
+}
 
+void MainWindow::addNewDB(QString db_path )
+{
+    jConfig["pathSql"] = db_path;
+    QJsonArray jCurArr = jConfig["dbPaths"].toArray();
+    int i = 0;
+    QJsonObject obj;
+    for(; i < jCurArr.size(); i++) {
+        obj = jCurArr[i].toObject();
+        if(obj[QString::number(i)].toString() == db_path)
+            break;
+    }
+    if(i == jCurArr.size()) {
+        obj = QJsonObject();
+        obj[QString::number(i)] = db_path;
+        obj["pathSqlConf"] = jConfig["pathDirData"].toString() + "/" + QString::number(i);
+        jCurArr.append(obj);
+        jConfig["dbPaths"] = jCurArr;
+    }
+    jConfig["pathSqlConf"] = obj["pathSqlConf"].toString();
+    saveAppConfig();
+}
+
+void MainWindow::loadAppConfig()
+{
+    QFile file(jConfig["pathApp"].toString());
+    if(!file.open(QFile::ReadOnly | QFile::Text)) {
+        qDebug() << "not open file to read app config";
+        return;
+    }
+    jConfig = QJsonDocument::fromJson(file.readAll()).object();
+    file.close();
+}
+
+void MainWindow::saveAppConfig()
+{
+    QFile file(jConfig["pathApp"].toString());
+    if(!file.open(QFile::WriteOnly | QFile::Text)) {
+        qDebug() << "not open file to save app config";
+        return;
+    }
+    file.write(QJsonDocument(jConfig).toJson());
+    file.close();
+}
+
+bool MainWindow::prepWorkPath()
+{
+    QString pathApp = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" + appDirName + "/" + appConfig;
+    jConfig["pathApp"] = pathApp;
+
+    if(!QFileInfo::exists(pathApp)) {               // Если папка отсутствует инициализируем по умолчанию
+        QDir pathAppDir(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" + appDirName);
+        if(!pathAppDir.exists())
+            pathAppDir.mkdir(pathAppDir.path());
+        QDir pathDirData(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/" + appDirName);
+        if(!pathDirData.exists())
+            pathDirData.mkdir(pathDirData.path());
+        jConfig["pathDirData"] = pathDirData.path();
+        QString pathSql = jConfig["pathDirData"].toString() + "/" + dbName;
+        jConfig["mode"] = "home";
+        jConfig["dbPaths"] = QJsonArray();
+        addNewDB(pathSql);
+//        QJsonArray jarray;
+//        QJsonObject jobj;
+//        jobj["0"] = jConfig["pathSql"].toString();
+//        jarray.append(jobj);
+//        jConfig["dbPaths"] = jarray;
+//        jConfig["pathSqlConf"] = pathDirData.path() + "/" + "0";
+//        saveAppConfig();
+    } else {
+        loadAppConfig();
+    }
+
+    qDebug() << jConfig["pathApp"].toString();
+    qDebug() << jConfig["pathDirData"].toString();
+    qDebug() << jConfig["pathSql"].toString();
+
+
+//    return false;
+
+//    QString curPath = QApplication::applicationDirPath();
+//    if(!QFileInfo::exists(curPath + "/" +fileNameConfig)) {            // 1
+//        QString nameConfig = curPath + "/" + fileNameConfig;
+//        qDebug() << "nameConfig" << nameConfig;
+//        QFile fileConfig(nameConfig);
+//        if(!fileConfig.open(QFile::WriteOnly | QFile::Text)) {
+//            int ret = QMessageBox::warning(this, "Warning",
+//                                           "В текущей дирректории не удаётся сохранить данные, желаете работать c домашним каталогом?",
+//                                           QMessageBox::Ok, QMessageBox::Cancel);
+//            switch (ret) {
+//            case QMessageBox::Cancel:
+//                qDebug() << "cancel";
+//                return false;
+//            case QMessageBox::Ok:
+//                pathData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+//                QDir dir(pathData);
+//                if(!dir.exists(pathData)) {
+//                    qDebug() << "path not exists";
+//                    dir.mkdir(pathData);
+//                }
+//                qDebug() << "PATH: " << pathData;
+//                qDebug() << "CONFIG: " << pathData + "/" + fileNameConfig;
+//                qDebug() << "SQL: " << pathData + "/" + dbName;
+//                return true;
+
+//            }
+//        }
+//        fileConfig.close();
+//    }
+//    pathData = curPath = QApplication::applicationDirPath();;
+//    qDebug() << "PATH: " << curPath;
+//    qDebug() << "CONFIG: " << curPath + "/" + fileNameConfig;
+//    qDebug() << "SQL: " << curPath + "/" + dbName;
     return true;
+}
 
+void MainWindow::saveConfig()
+{
+    QJsonArray jarray;
+    QMapIterator<QString, CustomSet > it(dataSet);
+    while(it.hasNext()) {
+        it.next();
+        if(it.key() == _service)
+            continue;
+        QJsonObject jobj;
+        jobj["name"] = it.value().name;
+        jobj["color"] = it.value().color;
+        jobj["width"] = it.value().width;
+        jarray.append(jobj);
+    }
+    jDataConfig = jarray;
+    updateConfig();
+}
+
+void MainWindow::loadConfig()
+{
+    QFile fileRead(jConfig["pathSqlConf"].toString());
+    if(!fileRead.open(QFile::ReadOnly | QFile::Text)) {
+        qDebug() << "Error config file not open to read";
+        return;
+    }
+    QJsonDocument jdoc = QJsonDocument::fromJson(fileRead.readAll());
+    fileRead.close();
+    QJsonArray jarray = jdoc.array();
+    QJsonArray matching;
+    for(QString _tableName: dataSet.keys()) {
+        for(int i = 0; i < jarray.size(); i++)
+            if(jarray[i].toObject()["name"].toString() == _tableName) {
+                dataSet[_tableName].color = jarray[i].toObject()["color"].toString();
+                dataSet[_tableName].width = jarray[i].toObject()["width"].toString();
+            }
+    }
+    jDataConfig = matching;
+}
+
+void MainWindow::resetWindow()
+{
+    QStringList list = dataSet.keys();
+    for(QString str: list) {
+        if(str == _service)
+            continue;
+        int curIndexBar = bar->currentIndex();
+        bar->removeTab(curIndexBar);
+        curIndexBar++;
+        bar->setCurrentIndex(curIndexBar);
+        dataSet.remove(str);
+    }
 }
 
 void MainWindow::slotTest()
@@ -259,22 +437,22 @@ void MainWindow::updateBox()
     QStringList list = emit signalLoadTables();
     cmbbox->addItems(list);
 
-//    for(int i = 0; i < list.size(); i++) {
-//        bar->addTab(list[i]);
-//    }
 }
 
-void MainWindow::initISql()
+void MainWindow::initISql(QString _path)
 {
-    ISql *isql = new ISql(pathData);
+    isql = new ISql(_path);
+//    QPointer<ISql* > = new ISql(_path);
     _thread = new QThread;
     connect(_thread, &QThread::started, isql, &ISql::doWork);
     connect(_thread, &QThread::finished, isql, &ISql::deleteLater);
+    connect(isql, &ISql::finished, isql, &ISql::deleteLater);
     QObject::connect(this, &MainWindow::signalCreateTable, isql, &ISql::createTable, Qt::BlockingQueuedConnection);
     QObject::connect(this, &MainWindow::signalLoadTables, isql, &ISql::loadTables, Qt::BlockingQueuedConnection);
     QObject::connect(this, &MainWindow::signalDeleteTable, isql, &ISql::deleteTable);
     QObject::connect(this, &MainWindow::signalGetDataTable, isql, &ISql::loadData);
     QObject::connect(this, &MainWindow::signalSaveData, isql, &ISql::saveData);
+    QObject::connect(this, &MainWindow::signalExitThread, isql, &ISql::exit);
     QObject::connect(isql, &ISql::signalReady, this, &MainWindow::slotReadySql);
     QObject::connect(isql, &ISql::signalSendDataTable, this, &MainWindow::initData);
 
@@ -287,6 +465,10 @@ void MainWindow::initISql()
 void MainWindow::slotDataChanged()
 {
 //    dataSet[dataSet[_service].name].points = model->getPoints();
+    QPixmap pixmap(":/modified.png");
+    QIcon ico = QIcon(pixmap);
+    bar->setTabIcon(bar->currentIndex(), ico);
+    bar->setIconSize(QSize(15, 15));
     setSeries();
 //    qDebug() << "*** name" << dataSet[_service].name <<  model->getPoints();
 }
@@ -310,8 +492,9 @@ void MainWindow::slotReadySql()
 
 void MainWindow::initData(CustomSet _set)
 {
-    qDebug() << "respons" << _set.name ;
+//    qDebug() << "respons" << _set.name ;
     dataSet[_set.name] = _set;
+    loadConfig();
     createTab(_set.name);
 }
 
@@ -343,6 +526,7 @@ void MainWindow::removeTab(QString _tableName)
         emit signalDeleteTable(_tableName);
         dataSet.remove(_tableName);
         updateBox();
+        saveConfig();
 
     } catch (int a) {
         switch (a) {
@@ -352,6 +536,17 @@ void MainWindow::removeTab(QString _tableName)
         }
     }
 
+}
+
+void MainWindow::updateConfig()
+{
+    QFile fileWrite(jConfig["pathSqlConf"].toString());
+    if(!fileWrite.open(QFile::WriteOnly | QFile::Text)) {
+        qDebug() << "Error config file not open to write";
+        return;
+    }
+    fileWrite.write(QJsonDocument(jDataConfig).toJson());
+    fileWrite.close();
 }
 
 

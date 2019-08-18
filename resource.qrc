@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>addico.png</file>
+        <file>modified.png</file>
+    </qresource>
+</RCC>

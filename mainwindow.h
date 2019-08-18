@@ -9,14 +9,19 @@
 #include <QQueue>
 #include <QMessageBox>
 #include <QSqlTableModel>
+#include <QFileDialog>
 #include <QTableView>
 #include <QPushButton>
+#include <QSharedPointer>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QtCharts/QChartView>
 #include <QTabWidget>
 #include <QVBoxLayout>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
 #include <QThread>
 #include "pairs.h"
 #include "dialog.h"
@@ -39,7 +44,9 @@ public:
     ~MainWindow();
 
 private:
-    QString pathData;
+    QString pathDB;
+    QJsonArray jDataConfig;
+    QJsonObject jConfig;
     Ui::MainWindow *ui;
     QMap<QString, CustomSet > dataSet;
     QPushButton *saveButton;
@@ -58,11 +65,25 @@ private:
     QMutex mutex;
     QThread *_thread;
     QTabBar *bar;
+
+    ISql *isql;
+
+    QString getIndexCurName();
+    void addNewDB(QString db_path);
+    void loadAppConfig();
+    void saveAppConfig();
+
     bool prepWorkPath();
+    void updateConfig();
+    void saveConfig();
+    void loadConfig();
+
+
+    void resetWindow();
     void setSeries();
     void initSet();
     void updateBox();
-    void initISql();
+    void initISql(QString _path);
     void createTab(QString _tableName);
     void removeTab(QString _tableName);
 public slots:
@@ -74,6 +95,7 @@ public slots:
     void slotReadySql();
     void initData(CustomSet _set);
 signals:
+    void signalExitThread();
     void signalLockChanged();
     void signalCreateTable(QString);
     void signalDeleteTable(QString);

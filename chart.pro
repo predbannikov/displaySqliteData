@@ -46,3 +46,7 @@ windows{
     CONFIG += release
 }
 
+RESOURCES += \
+    resource.qrc
+
+

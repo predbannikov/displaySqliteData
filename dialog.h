@@ -6,6 +6,7 @@
 #include <QWidget>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QComboBox>
 #include <QMessageBox>
 #include <QLabel>
 #include <QRandomGenerator>
@@ -32,7 +33,7 @@ protected:
     QString name_set;
     QString randomColor();
     QString inversColor(QString col);
-//    QString style;
+    QComboBox *cmbBox;
     void setStyleColorBt();
 signals:
 

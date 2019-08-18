@@ -33,6 +33,7 @@ Dialog::Dialog(QMap<QString, CustomSet > &sets, QWidget *parent) : QDialog(paren
                 CustomSet set;
                 set.name = name_set;
                 set.color = "#" + color_name;
+                set.width = this->cmbBox->currentText().remove(this->cmbBox->currentText().count()-2, 2);
                 set.active = false;
                 sets.insert(this->name_set, set);
                 sets[_service].name = name_set;
@@ -41,14 +42,14 @@ Dialog::Dialog(QMap<QString, CustomSet > &sets, QWidget *parent) : QDialog(paren
             }
         }
     });
-    QPushButton *pbClose = new QPushButton("Close");
+    QPushButton *pbClose = new QPushButton("cancel");
     connect(pbClose, &QPushButton::clicked, this, &Dialog::reject);
 
 
     color_name = randomColor();
-    QString t_color = inversColor(color_name);
+//    QString t_color = inversColor(color_name);
     ClickableLabel *pbSetColor = new ClickableLabel("choose color");
-    QString style = QString("QLabel {background-color : #%1; color: #%2;}").arg(color_name).arg(t_color);
+    QString style = QString("QLabel {background-color : #%1; color: #%2;}").arg(color_name).arg(inversColor(color_name));
     pbSetColor->setStyleSheet(style);
 //    qDebug() << this->color_name << style;
     QString cname;
@@ -63,7 +64,15 @@ Dialog::Dialog(QMap<QString, CustomSet > &sets, QWidget *parent) : QDialog(paren
 //        qDebug() << this->color_name << style;
     });
 
+    cmbBox = new QComboBox;
+    for(int i = 1; i < 45; i+=3)
+        cmbBox->addItem(QString("%1px").arg(QString::number(i)));
+
+    QLabel *lblCmbBox = new QLabel("width");
+
     hbLayout->addWidget(pbClose);
+    hbLayout->addWidget(lblCmbBox);
+    hbLayout->addWidget(cmbBox);
     hbLayout->addWidget(pbSetColor);
     hbLayout->addWidget(ledit);
     hbLayout->addWidget(pbOk);

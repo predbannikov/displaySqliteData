@@ -23,7 +23,7 @@ private:
     QQueue<QJsonObject> queue;
     QMutex mutex;
     QMap<QString, const CustomSet *> data;
-    QString pathData;
+    QString pathDB;
 
     void parsQueue();
 public slots:
@@ -33,8 +33,9 @@ public slots:
     void createTable(QString _tableName);
     void deleteTable(QString _tableName);
     void saveData(const CustomSet _set);
-    void saveWidth(QString _tableName);
+    void exit();
 signals:
+    void finished();
     void signalReady();
     void signalSendDataTable(CustomSet);
 };

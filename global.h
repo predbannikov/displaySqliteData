@@ -17,5 +17,7 @@ struct CustomSet {
 static const QString _service = "service";
 static const QString dbName = "db_name.sqlite";
 static const QString fileNameConfig = "config_data";
+static const QString appConfig = "config_app";
+static const QString appDirName = "displayChartSqlite";
 
 #endif // GLOBAL_H
