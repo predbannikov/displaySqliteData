@@ -5,12 +5,20 @@
  *      dataSet - QMap загруженных всех данных с БД
  *      первый элемент <_service> вспомогательный для передачи параметров
  *
- *      createTab(QString table) - создать таблицу и соответсвующую вкладку
- *
+ *      createTab(QString table)    - создать таблицу и соответсвующую вкладку
+ *      removeTab(QString table)    - удалить таблицу и вкладку
+ *      initISql(QString path)      - запустить поток sql, path - связать sql с файлом
+ *      setSeries()                 - перерисовать график с новыми данными
+ *      resetWindow()               - сбросить окно, запускать перед инициализацией sql
+ *      prepWorkPath                - подготовить пути по умолчанию
+ *      saveAppConfig, loadAppConfig    - загрузить настройки приложения
+ *      addNewDB                    - обновить настройки программы и установить рабочие пути до баз данных и их конфигов
+ *      loadConfig, saveConfig, updateConfig - записать/прочитать настройки баз данных
  *
  *
  *  2) ISql - поток обрабатывающий очередь комманд
- *
+ *      createTable, deleteTable,   - создать / удалить таблицу
+ *      loadData, saveData, exit    - добавляет в очередь соответствующие действия для выполнения
  *
  */
 #include "mainwindow.h"
@@ -265,13 +273,7 @@ bool MainWindow::prepWorkPath()
         jConfig["mode"] = "home";
         jConfig["dbPaths"] = QJsonArray();
         addNewDB(pathSql);
-//        QJsonArray jarray;
-//        QJsonObject jobj;
-//        jobj["0"] = jConfig["pathSql"].toString();
-//        jarray.append(jobj);
-//        jConfig["dbPaths"] = jarray;
-//        jConfig["pathSqlConf"] = pathDirData.path() + "/" + "0";
-//        saveAppConfig();
+
     } else {
         loadAppConfig();
     }
@@ -279,43 +281,6 @@ bool MainWindow::prepWorkPath()
     qDebug() << jConfig["pathApp"].toString();
     qDebug() << jConfig["pathDirData"].toString();
     qDebug() << jConfig["pathSql"].toString();
-
-
-//    return false;
-
-//    QString curPath = QApplication::applicationDirPath();
-//    if(!QFileInfo::exists(curPath + "/" +fileNameConfig)) {            // 1
-//        QString nameConfig = curPath + "/" + fileNameConfig;
-//        qDebug() << "nameConfig" << nameConfig;
-//        QFile fileConfig(nameConfig);
-//        if(!fileConfig.open(QFile::WriteOnly | QFile::Text)) {
-//            int ret = QMessageBox::warning(this, "Warning",
-//                                           "В текущей дирректории не удаётся сохранить данные, желаете работать c домашним каталогом?",
-//                                           QMessageBox::Ok, QMessageBox::Cancel);
-//            switch (ret) {
-//            case QMessageBox::Cancel:
-//                qDebug() << "cancel";
-//                return false;
-//            case QMessageBox::Ok:
-//                pathData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-//                QDir dir(pathData);
-//                if(!dir.exists(pathData)) {
-//                    qDebug() << "path not exists";
-//                    dir.mkdir(pathData);
-//                }
-//                qDebug() << "PATH: " << pathData;
-//                qDebug() << "CONFIG: " << pathData + "/" + fileNameConfig;
-//                qDebug() << "SQL: " << pathData + "/" + dbName;
-//                return true;
-
-//            }
-//        }
-//        fileConfig.close();
-//    }
-//    pathData = curPath = QApplication::applicationDirPath();;
-//    qDebug() << "PATH: " << curPath;
-//    qDebug() << "CONFIG: " << curPath + "/" + fileNameConfig;
-//    qDebug() << "SQL: " << curPath + "/" + dbName;
     return true;
 }
 
@@ -380,9 +345,7 @@ void MainWindow::clickView(QModelIndex index)
 {
     int col = index.column();
     int icol = model->columnCount(index)-1;
-//    qDebug() << "index" << col << icol;
     if(col == icol) {
-//        qDebug() << "last";
         model->addCell();
     }
 }
@@ -407,7 +370,6 @@ void MainWindow::setSeries()
 
     chart->legend()->setVisible(true);
     chart->legend()->setAlignment( Qt::AlignTop);
-//    chart->setTitle(name);
 
     chartView->repaint();
 
@@ -425,15 +387,12 @@ void MainWindow::initSet()
       << QPointF(11, 1) << QPointF(14,1) << QPointF(11,1) << QPointF(12,5) << QPointF(15, 5)
       << QPointF(18,3) << QPointF(12.75,3) <<  QPointF(18, 3) << QPointF(15, 1);
     _set.points.append(s);
-//    _set.points.append(s1);
-//    _set.points.append(s2);
     dataSet.insert(_service, _set);
 }
 
 void MainWindow::updateBox()
 {
     cmbbox->clear();
-//    qDebug() << "MainWindow updateBox id:" << this->thread()->currentThreadId();
     QStringList list = emit signalLoadTables();
     cmbbox->addItems(list);
 
@@ -442,7 +401,6 @@ void MainWindow::updateBox()
 void MainWindow::initISql(QString _path)
 {
     isql = new ISql(_path);
-//    QPointer<ISql* > = new ISql(_path);
     _thread = new QThread;
     connect(_thread, &QThread::started, isql, &ISql::doWork);
     connect(_thread, &QThread::finished, isql, &ISql::deleteLater);
@@ -464,13 +422,11 @@ void MainWindow::initISql(QString _path)
 
 void MainWindow::slotDataChanged()
 {
-//    dataSet[dataSet[_service].name].points = model->getPoints();
     QPixmap pixmap(":/modified.png");
     QIcon ico = QIcon(pixmap);
     bar->setTabIcon(bar->currentIndex(), ico);
     bar->setIconSize(QSize(15, 15));
     setSeries();
-//    qDebug() << "*** name" << dataSet[_service].name <<  model->getPoints();
 }
 
 bool MainWindow::containsName(QString name)

@@ -15,7 +15,7 @@ class ISql : public QObject
 {
     Q_OBJECT
 public:
-    explicit ISql(QString path = "/home/user/.local/share", QObject *parent = nullptr);
+    explicit ISql(QString path = "/home/user/.local/share/db_name.sqlite", QObject *parent = nullptr);
     ~ISql();
 
 private:
